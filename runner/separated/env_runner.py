@@ -23,6 +23,7 @@ class EnvRunner(Runner):
         episodes = int(self.num_env_steps) // self.episode_length // self.n_rollout_threads
 
         for episode in range(episodes):
+            print(episode)
             if self.use_linear_lr_decay:
                 for agent_id in range(self.num_agents):
                     self.trainer[agent_id].policy.lr_decay(episode, episodes)
@@ -83,24 +84,26 @@ class EnvRunner(Runner):
                     )
                 )
 
-                if self.env_name == "MPE":
-                    for agent_id in range(self.num_agents):
-                        idv_rews = []
-                        for info in infos:
-                            if "individual_reward" in info[agent_id].keys():
-                                idv_rews.append(info[agent_id]["individual_reward"])
-                        train_infos[agent_id].update({"individual_rewards": np.mean(idv_rews)})
-                        train_infos[agent_id].update(
-                            {
-                                "average_episode_rewards": np.mean(self.buffer[agent_id].rewards)
-                                * self.episode_length
-                            }
-                        )
+                # if self.env_name == "MPE":
+                #     for agent_id in range(self.num_agents):
+                #         idv_rews = []
+                #         for info in infos:
+                #             if "individual_reward" in info[agent_id].keys():
+                #                 idv_rews.append(info[agent_id]["individual_reward"])
+                #         train_infos[agent_id].update({"individual_rewards": np.mean(idv_rews)})
+                #         train_infos[agent_id].update(
+                #             {
+                #                 "average_episode_rewards": np.mean(self.buffer[agent_id].rewards)
+                #                 * self.episode_length
+                #             }
+                #         )
                 self.log_train(train_infos, total_num_steps)
 
             # eval
             if episode % self.eval_interval == 0 and self.use_eval:
+                self.eval_warmup()
                 self.eval(total_num_steps)
+                self.train_warmup()
 
     def warmup(self):
         # reset env
@@ -256,6 +259,7 @@ class EnvRunner(Runner):
 
                 eval_action = eval_action.detach().cpu().numpy()
                 # rearrange action
+                # print(self.eval_envs.action_space[agent_id].__class__.__name__)
                 if self.eval_envs.action_space[agent_id].__class__.__name__ == "MultiDiscrete":
                     for i in range(self.eval_envs.action_space[agent_id].shape):
                         eval_uc_action_env = np.eye(self.eval_envs.action_space[agent_id].high[i] + 1)[
@@ -270,7 +274,8 @@ class EnvRunner(Runner):
                         np.eye(self.eval_envs.action_space[agent_id].n)[eval_action], 1
                     )
                 else:
-                    raise NotImplementedError
+                    eval_action_env=eval_action
+                    # raise NotImplementedError
 
                 eval_temp_actions_env.append(eval_action_env)
                 eval_rnn_states[:, agent_id] = _t2n(eval_rnn_state)

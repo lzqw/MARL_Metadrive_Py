@@ -106,7 +106,10 @@ class EnvRunner(Runner):
 
             # eval
             if episode % self.eval_interval == 0 and self.use_eval:
+
+                self.eval_warmup()
                 self.eval(total_num_steps)
+                self.train_warmup()
 
     def warmup(self):
         # reset env
@@ -166,7 +169,6 @@ class EnvRunner(Runner):
         else:
             # TODO 这里改造成自己环境需要的形式即可
             # TODO Here, you can change the shape of actions_env to fit your environment
-            print(action)
             actions_env = actions
             # raise NotImplementedError
 

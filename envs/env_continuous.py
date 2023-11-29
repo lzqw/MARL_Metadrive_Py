@@ -10,8 +10,8 @@ class ContinuousActionEnv(object):
     Wrapper for continuous action environment.
     """
 
-    def __init__(self,all_args):
-        self.env = EnvCore(all_args)
+    def __init__(self,all_args,config_env):
+        self.env = EnvCore(all_args,config_env)
         self.num_agent = self.env.agent_num
 
         self.signal_obs_dim = self.env.obs_dim
@@ -88,7 +88,7 @@ class ContinuousActionEnv(object):
         return np.stack(obs)
 
     def close(self):
-        pass
+        self.env.close()
 
     def render(self, mode="rgb_array"):
         pass

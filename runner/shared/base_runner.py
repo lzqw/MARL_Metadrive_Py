@@ -2,28 +2,84 @@ import os
 import numpy as np
 import torch
 from tensorboardX import SummaryWriter
+
+from envs.env_wrappers import DummyVecEnv
 from utils.shared_buffer import SharedReplayBuffer
+
 
 def _t2n(x):
     """Convert torch tensor to a numpy array."""
     return x.detach().cpu().numpy()
+
+
+def make_train_env(all_args, config_train):
+    def get_env_fn(rank, all_args, config_train):
+        def init_env():
+            # TODO 注意注意，这里选择连续还是离散可以选择注释上面两行，或者下面两行。
+            # TODO Important, here you can choose continuous or discrete action space by uncommenting the above two lines or the below two lines.
+
+            from envs.env_continuous import ContinuousActionEnv
+
+            env = ContinuousActionEnv(all_args, config_train)
+
+            # from envs.env_discrete import DiscreteActionEnv
+
+            # env = DiscreteActionEnv()
+
+            env.seed(all_args.seed + rank * 1000)
+            return env
+
+        return init_env
+
+    assert not (all_args.use_render and all_args.n_rollout_threads > 1), (
+        "if n_rollout_threads > 1 then use_render must "
+        "be False")
+
+    return DummyVecEnv([get_env_fn(i, all_args, config_train) for i in range(all_args.n_rollout_threads)])
+
+
+def make_eval_env(all_args, config_eval):
+    def get_env_fn(rank, all_args, config_eval):
+        def init_env():
+            # TODO 注意注意，这里选择连续还是离散可以选择注释上面两行，或者下面两行。
+            # TODO Important, here you can choose continuous or discrete action space by uncommenting the above two lines or the below two lines.
+            from envs.env_continuous import ContinuousActionEnv
+
+            env = ContinuousActionEnv(all_args, config_eval)
+            # from envs.env_discrete import DiscreteActionEnv
+            # env = DiscreteActionEnv()
+            env.seed(all_args.seed + rank * 1000)
+            return env
+
+        return init_env
+
+    assert not (all_args.use_render and all_args.n_eval_rollout_threads > 1), ("if n_eval_rollout_threads > 1 then "
+                                                                               "use_render must"
+                                                                               "be False")
+    return DummyVecEnv([get_env_fn(i, all_args, config_eval) for i in range(all_args.n_eval_rollout_threads)])
+
 
 class Runner(object):
     """
     Base class for training recurrent policies.
     :param config: (dict) Config dictionary containing parameters for training.
     """
+
     def __init__(self, config):
 
         self.all_args = config['all_args']
-        self.envs = config['envs']
-        self.eval_envs = config['eval_envs']
+        self.config_train = config['config_train']
+        self.config_eval = config['config_eval']
+        self.envs = make_train_env(self.all_args, self.config_train)
+        self.eval_envs = None  # 初始化，仅创建训练环境，不创建评估环境
+        # self.eval_envs = make_eval_env(self.all_args, self.config_eval)
+
         self.device = config['device']
         self.num_agents = config['num_agents']
         if config.__contains__("render_envs"):
-            self.render_envs = config['render_envs']       
+            self.render_envs = config['render_envs']
 
-        # parameters
+            # parameters
         self.env_name = self.all_args.env_name
         self.algorithm_name = self.all_args.algorithm_name
         self.experiment_name = self.all_args.experiment_name
@@ -60,27 +116,36 @@ class Runner(object):
         from algorithms.algorithm.r_mappo import RMAPPO as TrainAlgo
         from algorithms.algorithm.rMAPPOPolicy import RMAPPOPolicy as Policy
 
-        share_observation_space = self.envs.share_observation_space[0] if self.use_centralized_V else self.envs.observation_space[0]
+        share_observation_space = self.envs.share_observation_space[0] if self.use_centralized_V else \
+            self.envs.observation_space[0]
 
         # policy network
         self.policy = Policy(self.all_args,
-                            self.envs.observation_space[0],
-                            share_observation_space,
-                            self.envs.action_space[0],
-                            device = self.device)
+                             self.envs.observation_space[0],
+                             share_observation_space,
+                             self.envs.action_space[0],
+                             device=self.device)
 
         if self.model_dir is not None:
             self.restore()
 
         # algorithm
-        self.trainer = TrainAlgo(self.all_args, self.policy, device = self.device)
-        
+        self.trainer = TrainAlgo(self.all_args, self.policy, device=self.device)
+
         # buffer
         self.buffer = SharedReplayBuffer(self.all_args,
-                                        self.num_agents,
-                                        self.envs.observation_space[0],
-                                        share_observation_space,
-                                        self.envs.action_space[0])
+                                         self.num_agents,
+                                         self.envs.observation_space[0],
+                                         share_observation_space,
+                                         self.envs.action_space[0])
+
+    def eval_warmup(self):
+        self.envs.close()
+        self.eval_envs = make_eval_env(self.all_args, self.config_eval)
+
+    def train_warmup(self):
+        self.eval_envs.close()
+        self.envs = make_train_env(self.all_args, self.config_train)
 
     def run(self):
         """Collect training data, perform training updates, and evaluate policy."""
@@ -100,21 +165,21 @@ class Runner(object):
         :param data: (Tuple) data to insert into training buffer.
         """
         raise NotImplementedError
-    
+
     @torch.no_grad()
     def compute(self):
         """Calculate returns for the collected data."""
         self.trainer.prep_rollout()
         next_values = self.trainer.policy.get_values(np.concatenate(self.buffer.share_obs[-1]),
-                                                np.concatenate(self.buffer.rnn_states_critic[-1]),
-                                                np.concatenate(self.buffer.masks[-1]))
+                                                     np.concatenate(self.buffer.rnn_states_critic[-1]),
+                                                     np.concatenate(self.buffer.masks[-1]))
         next_values = np.array(np.split(_t2n(next_values), self.n_rollout_threads))
         self.buffer.compute_returns(next_values, self.trainer.value_normalizer)
-    
+
     def train(self):
         """Train policies with data in buffer. """
         self.trainer.prep_training()
-        train_infos = self.trainer.train(self.buffer)      
+        train_infos = self.trainer.train(self.buffer)
         self.buffer.after_update()
         return train_infos
 
@@ -132,7 +197,7 @@ class Runner(object):
         if not self.all_args.use_render:
             policy_critic_state_dict = torch.load(str(self.model_dir) + '/critic.pt')
             self.policy.critic.load_state_dict(policy_critic_state_dict)
- 
+
     def log_train(self, train_infos, total_num_steps):
         """
         Log training info.
@@ -149,5 +214,5 @@ class Runner(object):
         :param total_num_steps: (int) total number of training env steps.
         """
         for k, v in env_infos.items():
-            if len(v)>0:
+            if len(v) > 0:
                 self.writter.add_scalars(k, {k: np.mean(v)}, total_num_steps)

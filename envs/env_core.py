@@ -23,19 +23,11 @@ class EnvCore(object):
     # 环境中的智能体
     """
 
-    def __init__(self,args):
+    def __init__(self,args,config):
         self.args=args
         env_cls_name = args.env
         self.env= envs[env_cls_name](
-        {
-            "use_render": True if not args.top_down else False,
-            # "use_render": False,
-            "crash_done": True,
-            "sensors": dict(rgb_camera=(RGBCamera, 512, 256)),
-            "interface_panel": ["rgb_camera", "dashboard"],
-            # "agent_policy": ManualControllableIDMPolicy,
-            "num_agents" :self.args.num_agents,
-        }
+            config
          )
         self.agent_num = self.args.num_agents
         self.obs_dim = list(self.env.observation_space.values())[0].shape[0]
@@ -43,6 +35,8 @@ class EnvCore(object):
         #[Box(-inf, inf, (2,), float32), Box(-inf, inf, (2,), float32)]
         self.action_space = list(self.env.action_space.values())
         self.observation_space=list(self.env.observation_space.values())
+
+
 
     def reset(self):
         """
@@ -76,6 +70,9 @@ class EnvCore(object):
         sub_agent_done = list(done.values())[:-1]
         sub_agent_info = list(info.values())
         return [sub_agent_obs, sub_agent_reward, sub_agent_done, sub_agent_info]
+
+    def close(self):
+        self.env.close()
 
 
 if __name__=="__main__" :

@@ -8,6 +8,8 @@
 
 
 #  TODO 正常启动train env，当eval开始前，需要关闭train env，然后启动eval env，eval结束后，需要关闭eval env，然后启动train env
+#  TODO use_render True or False的影响
+#  TODO env的seed需要设置，否则每次启动的env都是一样的，这样就无法进行对比了
 # !/usr/bin/env python
 import sys
 import os
@@ -16,6 +18,8 @@ import setproctitle
 import numpy as np
 from pathlib import Path
 import torch
+from metadrive.component.sensors.rgb_camera import RGBCamera
+from metadrive.policy.idm_policy import ManualControllableIDMPolicy
 
 # Get the parent directory of the current file
 parent_dir = os.path.abspath(os.path.join(os.getcwd(), "."))
@@ -71,7 +75,7 @@ def make_eval_env(all_args):
 
 def parse_args(args, parser):
     parser.add_argument("--scenario_name", type=str, default="MyEnv", help="Which scenario to run on")
-    parser.add_argument("--num_landmarks", type=int, default=3)
+    # parser.add_argument("--num_landmarks", type=int, default=3)
     parser.add_argument("--num_agents", type=int, default=2, help="number of players")
 
     all_args = parser.parse_known_args(args)[0]
@@ -152,14 +156,33 @@ def main(args):
     np.random.seed(all_args.seed)
 
     # env init
-    envs = make_train_env(all_args)
-    eval_envs = make_eval_env(all_args) if all_args.use_eval else None
+    # envs = make_train_env(all_args)
+    # eval_envs = make_eval_env(all_args) if all_args.use_eval else None
     num_agents = all_args.num_agents
+
+    config_train=dict(
+        use_render=all_args.use_render,
+        crash_done= True,
+        sensors=dict(rgb_camera=(RGBCamera, 512, 256)),
+        interface_panel=["rgb_camera", "dashboard"],
+        # agent_policy=ManualControllableIDMPolicy,
+        num_agents=num_agents,
+    )
+
+    config_eval=dict(
+        use_render=all_args.use_render_eval,
+        crash_done=True,
+        sensors=dict(rgb_camera=(RGBCamera, 512, 256)),
+        interface_panel=["rgb_camera", "dashboard"],
+        # agent_policy=ManualControllableIDMPolicy,
+        num_agents=num_agents,
+    )
+
 
     config = {
         "all_args": all_args,
-        "envs": envs,
-        "eval_envs": eval_envs,
+        "config_train": config_train,
+        "config_eval": config_eval,
         "num_agents": num_agents,
         "device": device,
         "run_dir": run_dir,
@@ -175,9 +198,10 @@ def main(args):
     runner.run()
 
     # post process
-    envs.close()
-    if all_args.use_eval and eval_envs is not envs:
-        eval_envs.close()
+    # TODO 把关闭env写了
+    # envs.close()
+    # if all_args.use_eval and eval_envs is not envs:
+    #     eval_envs.close()
 
     runner.writter.export_scalars_to_json(str(runner.log_dir + "/summary.json"))
     runner.writter.close()

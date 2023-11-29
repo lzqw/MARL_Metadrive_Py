@@ -5,19 +5,66 @@ from itertools import chain
 import torch
 from tensorboardX import SummaryWriter
 
+from envs.env_wrappers import DummyVecEnv
 from utils.separated_buffer import SeparatedReplayBuffer
 from utils.util import update_linear_schedule
 
 
 def _t2n(x):
     return x.detach().cpu().numpy()
+def make_train_env(all_args, config_train):
+    def get_env_fn(rank, all_args, config_train):
+        def init_env():
+            # TODO 注意注意，这里选择连续还是离散可以选择注释上面两行，或者下面两行。
+            # TODO Important, here you can choose continuous or discrete action space by uncommenting the above two lines or the below two lines.
 
+            from envs.env_continuous import ContinuousActionEnv
+
+            env = ContinuousActionEnv(all_args, config_train)
+
+            # from envs.env_discrete import DiscreteActionEnv
+
+            # env = DiscreteActionEnv()
+
+            env.seed(all_args.seed + rank * 1000)
+            return env
+
+        return init_env
+
+    assert not (all_args.use_render and all_args.n_rollout_threads > 1), (
+        "if n_rollout_threads > 1 then use_render must "
+        "be False")
+
+    return DummyVecEnv([get_env_fn(i, all_args, config_train) for i in range(all_args.n_rollout_threads)])
+
+
+def make_eval_env(all_args, config_eval):
+    def get_env_fn(rank, all_args, config_eval):
+        def init_env():
+            # TODO 注意注意，这里选择连续还是离散可以选择注释上面两行，或者下面两行。
+            # TODO Important, here you can choose continuous or discrete action space by uncommenting the above two lines or the below two lines.
+            from envs.env_continuous import ContinuousActionEnv
+
+            env = ContinuousActionEnv(all_args, config_eval)
+            # from envs.env_discrete import DiscreteActionEnv
+            # env = DiscreteActionEnv()
+            env.seed(all_args.seed + rank * 1000)
+            return env
+
+        return init_env
+
+    assert not (all_args.use_render and all_args.n_eval_rollout_threads > 1), ("if n_eval_rollout_threads > 1 then "
+                                                                               "use_render must"
+                                                                               "be False")
+    return DummyVecEnv([get_env_fn(i, all_args, config_eval) for i in range(all_args.n_eval_rollout_threads)])
 
 class Runner(object):
     def __init__(self, config):
         self.all_args = config["all_args"]
-        self.envs = config["envs"]
-        self.eval_envs = config["eval_envs"]
+        self.config_train = config['config_train']
+        self.config_eval = config['config_eval']
+        self.envs = make_train_env(self.all_args, self.config_train)
+        self.eval_envs = None  # 初始化，仅创建训练环境，不创建评估环境
         self.device = config["device"]
         self.num_agents = config["num_agents"]
 
@@ -52,6 +99,13 @@ class Runner(object):
             self.gif_dir = str(self.run_dir / "gifs")
             if not os.path.exists(self.gif_dir):
                 os.makedirs(self.gif_dir)
+            self.log_dir = str(self.run_dir / "logs")
+            if not os.path.exists(self.log_dir):
+                os.makedirs(self.log_dir)
+            self.writter = SummaryWriter(self.log_dir)
+            self.save_dir = str(self.run_dir / "models")
+            if not os.path.exists(self.save_dir):
+                os.makedirs(self.save_dir)
         else:
             # if self.use_wandb:
             #     self.save_dir = str(wandb.run.dir)
@@ -107,6 +161,16 @@ class Runner(object):
             )
             self.buffer.append(bu)
             self.trainer.append(tr)
+
+    def eval_warmup(self):
+        self.envs.close()
+        self.eval_envs = make_eval_env(self.all_args, self.config_eval)
+
+    def train_warmup(self):
+        self.eval_envs.close()
+        self.envs = make_train_env(self.all_args, self.config_train)
+        self.envs.reset()
+
 
     def run(self):
         raise NotImplementedError
