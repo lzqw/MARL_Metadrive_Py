@@ -505,6 +505,17 @@ def get_config():
         default=None,
         help="by default None. set the path to pretrained model.",
     )
+
+
+    density = dict(
+        roundabout=0.05,
+        intersection=0.05,
+        tollgate=0.05,
+        bottleneck=0.05,
+        parkinglot=0.05,
+        pgma=0.05,
+        straight=0.05
+    )
     envs = dict(
         roundabout=MultiAgentRoundaboutEnv,
         intersection=MultiAgentIntersectionEnv,
@@ -514,12 +525,24 @@ def get_config():
         pgma=MultiAgentMetaDrive,
         straight=MultiAgentStraightEnv
     )
-    parser.add_argument("--env", type=str, default="straight", choices=list(envs.keys()))
+    parser.add_argument("--env", type=str, default="intersection", choices=list(envs.keys()))
     parser.add_argument("--top_down", default=False,action="store_true")
-    parser.add_argument("--num_agent", type=int,default=2)
-
-
-
+    parser.add_argument("--num_agents", type=int,default=3)
+    parser.add_argument(
+        "--random_traffic",
+        type=bool,
+        default=True,
+        help="by default True, other human vehicle randomly on road.",
+    )
+    parser.add_argument(
+        "--human_vehicle",
+        type=bool,
+        default=True,
+        help="by default True, other human vehicle on road.",
+    )
+    parser.add_argument("--traffic_density", type=dict,default=density)
+    parser.add_argument("--obs_num_others", type=int, default=4, help="the number of agent's observation")
+    parser.add_argument("--show_navi", type=bool, default=True, help="whether show navi mark")
 
     return parser
 
@@ -617,6 +640,6 @@ if __name__=="__main__":
     model_dir = None  # Path to pretrained model
 
     # Environment selection
-    env = "straight"  # Name of the environment
+    env = ""  # Name of the environment
     top_down = False  # Use top-down view (True) or not (False)
     num_agent = 2  # Number of agents

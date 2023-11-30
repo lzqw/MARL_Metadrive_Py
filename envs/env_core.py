@@ -72,6 +72,25 @@ class EnvCore(object):
         sub_agent_reward=list(reward.values())
         sub_agent_done = list(done.values())[:-1]
         sub_agent_info = list(info.values())
+
+        new_agent_processed = False  # Flag to track if new agent's data is already used
+        for agent_index, agent_done in enumerate(sub_agent_done):
+            if agent_done:
+                if sub_agent_info[agent_index].get('arrive_dest') and not new_agent_processed:
+                    # if len(sub_agent_done)!=self.agent_num:
+                    sub_agent_obs[agent_index] = sub_agent_obs[-1]
+                    sub_agent_obs = np.delete(sub_agent_obs, -1, axis=0)
+                    sub_agent_reward = np.delete(sub_agent_reward, -1)
+                    sub_agent_done = np.delete(sub_agent_done, -1)
+                    sub_agent_info = np.delete(sub_agent_info, -1)
+                    new_agent_processed = True  # Mark that new agent's data has been used
+                elif new_agent_processed:
+                    # If another agent is done and the new agent's data is already used, skip processing
+                    continue
+                else:
+                    # If the agent is done but hasn't reached its destination, reset the environment
+                    # ref = my_env.reset()
+                    break  # Assuming the entire environment is reset
         return [sub_agent_obs, sub_agent_reward, sub_agent_done, sub_agent_info]
 
     def close(self):

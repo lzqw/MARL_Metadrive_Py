@@ -32,7 +32,6 @@ from envs.env_wrappers import DummyVecEnv
 def parse_args(args, parser):
     parser.add_argument("--scenario_name", type=str, default="MyEnv", help="Which scenario to run on")
     # parser.add_argument("--num_landmarks", type=int, default=3)
-    parser.add_argument("--num_agents", type=int, default=6, help="number of players")
     all_args = parser.parse_known_args(args)[0]
     return all_args
 
@@ -122,10 +121,17 @@ def main(args):
         show_coordinates=True,
         image_observation=False,
         # interface_panel=["rgb_camera", "dashboard"],
+        random_traffic=all_args.human_vehicle,
+        traffic_density=all_args.traffic_density[all_args.env] if all_args.human_vehicle else 0,
 
         # agent_policy=ManualControllableIDMPolicy,
         num_agents=num_agents,
         vehicle_config=dict(
+            show_navi_mark=all_args.show_navi,
+            show_dest_mark=all_args.show_navi,
+            show_line_to_dest=all_args.show_navi,
+            use_special_color=True,
+            random_color=False,
             lidar=dict(
                 add_others_navi=False,
                 num_others=4,
@@ -145,10 +151,18 @@ def main(args):
         show_coordinates=True,
         image_observation=False,
         # interface_panel=["rgb_camera", "dashboard"],
+        random_traffic=all_args.human_vehicle,
+        traffic_density=all_args.traffic_density[all_args.env] if all_args.human_vehicle else 0,
+
 
         # agent_policy=ManualControllableIDMPolicy,
         num_agents=num_agents,
         vehicle_config=dict(
+            show_navi_mark=all_args.show_navi,
+            show_dest_mark=all_args.show_navi,
+            show_line_to_dest=all_args.show_navi,
+            use_special_color=True,
+            random_color=False,
             lidar=dict(
                 add_others_navi=False,
                 num_others=4,
