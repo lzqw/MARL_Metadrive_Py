@@ -185,7 +185,7 @@ def get_config():
     parser.add_argument(
         "--n_training_threads",
         type=int,
-        default=2,
+        default=5,
         help="Number of torch threads for training",
     )
     parser.add_argument(
@@ -209,7 +209,7 @@ def get_config():
     parser.add_argument(
         "--num_env_steps",
         type=int,
-        default=10e6,
+        default=20e6,
         help="Number of environment steps to train (default: 10e6)",
     )
     parser.add_argument(
@@ -259,13 +259,13 @@ def get_config():
     parser.add_argument(
         "--hidden_size",
         type=int,
-        default=64,
+        default=256,
         help="Dimension of hidden layers for actor/critic networks",
     )
     parser.add_argument(
         "--layer_N",
         type=int,
-        default=1,
+        default=3,
         help="Number of layers for actor/critic networks",
     )
     parser.add_argument("--use_ReLU", action="store_false", default=False, help="Whether to use ReLU")
@@ -349,7 +349,7 @@ def get_config():
     parser.add_argument(
         "--num_mini_batch",
         type=int,
-        default=1,
+        default=2,
         help="number of batches for ppo (default: 1)",
     )
     parser.add_argument(
@@ -488,7 +488,7 @@ def get_config():
     parser.add_argument(
         "--render_episodes",
         type=int,
-        default=5,
+        default=2,
         help="the number of episodes to render a given env",
     )
     parser.add_argument(

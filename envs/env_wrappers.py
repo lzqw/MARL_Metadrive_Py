@@ -8,6 +8,7 @@ Modified from OpenAI Baselines code to work with multi-agent envs
 
 import numpy as np
 
+
 # single env
 class DummyVecEnv():
     def __init__(self, env_fns):
@@ -34,20 +35,44 @@ class DummyVecEnv():
         results = [env.step(a) for (a, env) in zip(self.actions, self.envs)]
         obs, rews, dones, infos = map(np.array, zip(*results))
 
-        for (i, done) in enumerate(dones):
-            if 'bool' in done.__class__.__name__:
-                if done:
+        for i, (env_done, env_info) in enumerate(zip(dones, infos)):
+            if isinstance(env_done, bool):
+                # Handle single-agent environments
+                if env_done:
                     obs[i] = self.envs[i].reset()
             else:
-                # if np.all(done):
-                #     obs[i] = self.envs[i].reset()
-                if np.any(done):
-                    obs[i] = self.envs[i].reset()
+                # Handle multi-agent environments
+                new_agent_processed = False  # Flag to track if new agent's data is already used
+                for agent_index, agent_done in enumerate(env_done):
+                    if agent_done:
+                        # Check if the agent has reached its destination
+                        if env_info[agent_index].get('arrive_dest') and not new_agent_processed:
+                            # Replace the data of the first agent that reached its destination with the new agent's data
+                            obs[i][agent_index] = obs[i][-1]
+                            # rews[i][agent_index] = rews[i][-1]
+                            # dones[i][agent_index] = dones[i][-1]
+                            # infos[i][agent_index] = infos[i][-1]
+
+                            # Remove the last elements as they are now duplicates
+                            obs[i] = np.delete(obs[i], -1, axis=0)
+                            rews[i] = np.delete(rews[i], -1)
+                            dones[i] = np.delete(dones[i], -1)
+                            infos[i] = np.delete(infos[i], -1)
+
+                            new_agent_processed = True  # Mark that new agent's data has been used
+                        elif new_agent_processed:
+                            # If another agent is done and the new agent's data is already used, skip processing
+                            continue
+                        else:
+                            # If the agent is done but hasn't reached its destination, reset the environment
+                            obs[i] = self.envs[i].reset()
+                            break  # Assuming the entire environment is reset
+
         self.actions = None
         return obs, rews, dones, infos
 
     def reset(self):
-        obs = [env.reset() for env in self.envs] # [env_num, agent_num, obs_dim]
+        obs = [env.reset() for env in self.envs]  # [env_num, agent_num, obs_dim]
         return np.array(obs)
 
     def close(self):

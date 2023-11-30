@@ -4,12 +4,10 @@
 # @Email   : tinyzqh@163.com
 # @File    : train.py
 """
+import random
 
-
-
-#  TODO 正常启动train env，当eval开始前，需要关闭train env，然后启动eval env，eval结束后，需要关闭eval env，然后启动train env
-#  TODO use_render True or False的影响
 #  TODO env的seed需要设置，否则每次启动的env都是一样的，这样就无法进行对比了
+#  TODO 环境更复杂
 # !/usr/bin/env python
 import sys
 import os
@@ -30,56 +28,12 @@ sys.path.append(parent_dir)
 from config import get_config
 from envs.env_wrappers import DummyVecEnv
 
-"""Train script for MPEs."""
-
-
-def make_train_env(all_args):
-    def get_env_fn(rank,all_args):
-        def init_env():
-            # TODO 注意注意，这里选择连续还是离散可以选择注释上面两行，或者下面两行。
-            # TODO Important, here you can choose continuous or discrete action space by uncommenting the above two lines or the below two lines.
-
-            from envs.env_continuous import ContinuousActionEnv
-
-            env = ContinuousActionEnv(all_args)
-
-            # from envs.env_discrete import DiscreteActionEnv
-
-            # env = DiscreteActionEnv()
-
-            env.seed(all_args.seed + rank * 1000)
-            return env
-
-        return init_env
-
-    return DummyVecEnv([get_env_fn(i,all_args) for i in range(all_args.n_rollout_threads)])
-
-
-def make_eval_env(all_args):
-    def get_env_fn(rank,all_args):
-        def init_env():
-            # TODO 注意注意，这里选择连续还是离散可以选择注释上面两行，或者下面两行。
-            # TODO Important, here you can choose continuous or discrete action space by uncommenting the above two lines or the below two lines.
-            from envs.env_continuous import ContinuousActionEnv
-
-            env = ContinuousActionEnv(all_args)
-            # from envs.env_discrete import DiscreteActionEnv
-            # env = DiscreteActionEnv()
-            env.seed(all_args.seed + rank * 1000)
-            return env
-
-        return init_env
-
-    return DummyVecEnv([get_env_fn(i,all_args) for i in range(all_args.n_rollout_threads)])
-
 
 def parse_args(args, parser):
     parser.add_argument("--scenario_name", type=str, default="MyEnv", help="Which scenario to run on")
     # parser.add_argument("--num_landmarks", type=int, default=3)
-    parser.add_argument("--num_agents", type=int, default=2, help="number of players")
-
+    parser.add_argument("--num_agents", type=int, default=6, help="number of players")
     all_args = parser.parse_known_args(args)[0]
-
     return all_args
 
 
@@ -164,18 +118,46 @@ def main(args):
         use_render=all_args.use_render,
         crash_done= True,
         sensors=dict(rgb_camera=(RGBCamera, 512, 256)),
-        interface_panel=["rgb_camera", "dashboard"],
+        start_seed=random.randint(0, 1000),
+        show_coordinates=True,
+        image_observation=False,
+        # interface_panel=["rgb_camera", "dashboard"],
+
         # agent_policy=ManualControllableIDMPolicy,
         num_agents=num_agents,
+        vehicle_config=dict(
+            lidar=dict(
+                add_others_navi=False,
+                num_others=4,
+                distance=50,
+                num_lasers=30,
+            ),
+            side_detector=dict(num_lasers=30),
+            lane_line_detector=dict(num_lasers=12),
+        )
     )
 
     config_eval=dict(
         use_render=all_args.use_render_eval,
         crash_done=True,
         sensors=dict(rgb_camera=(RGBCamera, 512, 256)),
-        interface_panel=["rgb_camera", "dashboard"],
+        start_seed=random.randint(0, 1000),
+        show_coordinates=True,
+        image_observation=False,
+        # interface_panel=["rgb_camera", "dashboard"],
+
         # agent_policy=ManualControllableIDMPolicy,
         num_agents=num_agents,
+        vehicle_config=dict(
+            lidar=dict(
+                add_others_navi=False,
+                num_others=4,
+                distance=50,
+                num_lasers=30,
+            ),
+            side_detector=dict(num_lasers=30),
+            lane_line_detector=dict(num_lasers=12),
+        )
     )
 
 
@@ -198,10 +180,12 @@ def main(args):
     runner.run()
 
     # post process
-    # TODO 把关闭env写了
-    # envs.close()
+    runner.envs.close()
+    if all_args.use_eval:
+        runner.eval_envs.close()
+
     # if all_args.use_eval and eval_envs is not envs:
-    #     eval_envs.close()
+    #     runner.eval_envs.close()
 
     runner.writter.export_scalars_to_json(str(runner.log_dir + "/summary.json"))
     runner.writter.close()

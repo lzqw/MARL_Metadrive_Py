@@ -165,6 +165,7 @@ class Runner(object):
     def eval_warmup(self):
         self.envs.close()
         self.eval_envs = make_eval_env(self.all_args, self.config_eval)
+        self.eval_envs.reset()
 
     def train_warmup(self):
         self.eval_envs.close()
