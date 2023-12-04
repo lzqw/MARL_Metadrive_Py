@@ -349,7 +349,7 @@ def get_config():
     parser.add_argument(
         "--num_mini_batch",
         type=int,
-        default=2,
+        default=1,
         help="number of batches for ppo (default: 1)",
     )
     parser.add_argument(
@@ -643,3 +643,5 @@ if __name__=="__main__":
     env = ""  # Name of the environment
     top_down = False  # Use top-down view (True) or not (False)
     num_agent = 2  # Number of agents
+
+    #        num_updates = self.ppo_epoch * self.num_mini_batch

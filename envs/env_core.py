@@ -76,7 +76,7 @@ class EnvCore(object):
         new_agent_processed = False  # Flag to track if new agent's data is already used
         for agent_index, agent_done in enumerate(sub_agent_done):
             if agent_done:
-                if sub_agent_info[agent_index].get('arrive_dest') and not new_agent_processed:
+                if len(sub_agent_done)>self.agent_num :
                     # if len(sub_agent_done)!=self.agent_num:
                     sub_agent_obs[agent_index] = sub_agent_obs[-1]
                     sub_agent_obs = np.delete(sub_agent_obs, -1, axis=0)
@@ -84,7 +84,7 @@ class EnvCore(object):
                     sub_agent_done = np.delete(sub_agent_done, -1)
                     sub_agent_info = np.delete(sub_agent_info, -1)
                     new_agent_processed = True  # Mark that new agent's data has been used
-                elif new_agent_processed:
+                elif new_agent_processed and len(sub_agent_done)==self.agent_num:
                     # If another agent is done and the new agent's data is already used, skip processing
                     continue
                 else:
@@ -104,10 +104,13 @@ if __name__=="__main__" :
     parser.add_argument("--num_agents", type=int,default=5)
     args = parser.parse_args()
     config=dict(
+        random_spawn_lane_index=False,
+        start_seed=0,
+        random_traffic=False,
         use_render=True,
         crash_done=True,
         sensors=dict(rgb_camera=(RGBCamera, 512, 256)),
-        start_seed=random.randint(0, 1000),
+        # start_seed=random.randint(0, 1000),
         show_coordinates=True,
         allow_respawn=True,
         delay_done=0,

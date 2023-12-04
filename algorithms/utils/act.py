@@ -85,7 +85,7 @@ class ACTLayer(nn.Module):
             action_logit = self.action_out(x)
             actions = action_logit.mode() if deterministic else action_logit.sample()
             # _______________________________________________________
-            actions = torch.tanh(actions)
+            # actions = torch.tanh(actions)
             # _______________________________________________________
             action_log_probs = action_logit.log_probs(actions)
             # actions.append(action.float())

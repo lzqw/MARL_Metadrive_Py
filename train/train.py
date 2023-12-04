@@ -114,10 +114,12 @@ def main(args):
     num_agents = all_args.num_agents
 
     config_train=dict(
+        random_spawn_lane_index=False,
+        start_seed=0,
         use_render=all_args.use_render,
         crash_done= True,
         sensors=dict(rgb_camera=(RGBCamera, 512, 256)),
-        start_seed=random.randint(0, 1000),
+        # start_seed=random.randint(0, 1000),
         show_coordinates=True,
         image_observation=False,
         # interface_panel=["rgb_camera", "dashboard"],
@@ -144,10 +146,12 @@ def main(args):
     )
 
     config_eval=dict(
+        random_spawn_lane_index=False,
+        start_seed=0,
         use_render=all_args.use_render_eval,
         crash_done=True,
         sensors=dict(rgb_camera=(RGBCamera, 512, 256)),
-        start_seed=random.randint(0, 1000),
+        # start_seed=random.randint(0, 1000),
         show_coordinates=True,
         image_observation=False,
         # interface_panel=["rgb_camera", "dashboard"],
